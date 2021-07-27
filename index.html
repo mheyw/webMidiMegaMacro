@@ -65,7 +65,7 @@
   //create learner object
   const learner = new Learner({docId:"test"});
   
-  //Create options for number of Regressions 1-127
+  //Create options for number of Regressions 1 - number of output CC channels set previous
   //Should equal the number of midi CC channels!
   
   for(let i = 1; i <= oCC.length; i++){
@@ -252,6 +252,7 @@
   //Clear array used for MIDI CC values
   function midiClearLearn () {
     ccVals.length = 0;
+    document.getElementById("midi-label").innerHTML = "";
   }
   
 </script>
