@@ -1,89 +1,259 @@
-<!DOCTYPE html>
-<html>
+<html lang=en>
 <head>
   <script src = "./libs/learner.v.0.3.js"></script>
-  <script src = "./libs/maxiInstruments.v.0.5.js"></script>
-  <button
-    style = "margin-top:20px;margin-bottom:20px;height:30px;"
-    onclick = "launchSynth()">Load Synths (User input required)
-  </button>
-  <div style = "width:400px;height:200px;background-color:blue;" id = "input"></div>
-  <div style = "width:400px;" id = "dataset"></div>
-  <div id = "synths"></div>
+  <script src = "./libs/MIMICMIDI.js"></script>
+  <script src = "./libs/webmidi.min.js"></script>
+  <link rel="stylesheet" href="./style/styles.css"/>
 </head>
+
 <body>
-  <script type="text/javascript">
- 	  const learner = new Learner({docId:"test"})
-    learner.addGUI(document.getElementById("dataset"))
-    //learner.addClassifier(3)
-    // let y = [0]
-    const recordXY = (event)=> {
-      learner.newExample([event.clientX, event.clientY], instruments.getMappedOutputs());
+  <div class = "midiIn">
+    <h3>Midi Input</h3>
+    <div id = "midi-input-container">
+      <button id = "refreshDevice-input-button" onclick="refreshInputDevices()">Get Midi Devices</button>
+    </div>
+    <div>
+        <button id = "midi-learn-button" onclick="midiLearn()" style="display:none">Start Midi Learn</button>
+        <button id = "midi-clearLearn-button" onclick="midiClearLearn()" style="display:none">Clear Midi Learn</button>
+    </div>
+    <p id = "midi-label"/>
+  </div>
+
+  <div id = "outputsSelect">
+    <p>Number of Output CC Channels</p>
+    <select id = "regressionOutput"></select>
+    <button id = "addRegression-button" onclick="addRegressionConfirm()">Confirm</button>
+  </div>
+
+  <div id = "dataset">
+    <h3>Machine Learning</h3>
+  </div>
+  
+  <div class = "midiOut">
+    <h3>Midi Output</h3>
+    <div id = "midi-output-container">
+      <button id = "refreshDevice-output-button" onclick="refreshOutputDevices()">Get Midi Devices</button>
+    </div>
+  </div>
+<script>
+  //SETUP
+  const ccVals = [];
+  let y = [];
+  let input = {};
+  
+  ccVals.forEach((k)=> {
+    input[k] = 0;
+  });
+  
+  //Array of CC channel values to map Learner to
+  //CHANGE THESE VALUES TO EDIT OUTPUT CC CHANNELS
+  let oCC = [1,5];
+  //for loops to populate array with CC channel values
+  //Channel 25-37
+  for(let i = 25; i <= 37; i++){
+    oCC.push(i);
+  }
+  //Channel 39-62
+  for(let i = 39; i <= 62; i++){
+    oCC.push(i);
+  }
+  ////Channel 70-91
+  for(let i = 70; i <= 91; i++){
+    oCC.push(i);
+  }
+  
+  //create learner object
+  const learner = new Learner({docId:"test"});
+  
+  //Create options for number of Regressions 1-127
+  //Should equal the number of midi CC channels!
+  
+  for(let i = 1; i <= oCC.length; i++){
+    const opt = document.createElement("option");        
+    // Assign text and value to Option object
+    opt.text = i;
+    opt.value = i;
+    // Add an Option object to Drop Down List Box
+    document.getElementById("regressionOutput").options.add(opt);
+  }
+  
+  //Add reggressions once user selects number
+  function addRegressionConfirm () {
+    //Add GUI with id of parent element
+    //It won't work without the GUI?!
+    learner.addGUI(document.getElementById("dataset"));
+    
+    //Add regressions based on value taken from selector instead of hard coding the value
+    const e = document.getElementById("regressionOutput");
+    
+    //Add number of Reggressions based off selected value
+    learner.addRegression(e.options[e.selectedIndex].value);
+    for(let i = 0; i < e.options[e.selectedIndex].value; i++){
+      y.push(0);
     }
-    document.getElementById("input").addEventListener("click", recordXY);
-    //Callback for result
-    learner.onOutput = (output)=> {
-      //y = output
-      instruments.updateMappedOutputs(output)
-      console.log(output)
-    };
-    learner.setModelOptions({
-      numHiddenNodes:8
+    
+    //Remove selector
+    //you can only set regressions once without breaking things?!
+    document.getElementById("outputsSelect").style.display = "none";
+  }
+  
+  ////Learner.js OUTPUT////
+  //for every data pair send midi control change using oCC array for channel values
+  //Callback for Regression result
+  learner.onOutput = (data)=> {
+    y = data;
+    y.forEach((val, i)=> {
+      midi.output.sendControlChange(oCC[i],Math.floor(val * 127), selectedChannel);
     });
+  };
+  
+  ////MIDI////
+  //New Midi Object
+  const midi = new MIDI();
 
-    //OUPUT
-    const instruments = new MaxiInstruments();
-    var synth, sampler;
-    const launchSynth = ()=> {
-      instruments.guiElement = document.getElementById("synths");
-      instruments.loadModules().then(()=> {
-        synth = instruments.addSynth();
-        synth.mapped = ["lfoFrequency", "lfoAmpMod","attack", "release", "cutoff","pan","lfoFilterMod", "sustain", "decay"];
-        synth.setOsc(2);
-        var em7 = [64, 67, 71, 74]
-        var g7 = [62, 65, 67, 71]
-        var cmaj9 = [60, 64, 67, 71]
-        var fsharpm = [61, 64, 66, 69]
-        var b7 = [59, 63, 66, 71]
-        var synthSeq = [
-          {s:0, l:48, p:em7},
-          {s:48, l:48, p:g7},
-          {s:96, l:48, p:cmaj9},
-          {s:144, l:24, p:fsharpm},
-          {s:168, l:24, p:b7},
-        ];
-        synth.setSequence(synthSeq)
-
-        sampler = instruments.addSampler();
-        let origin = document.location.origin
-        if(origin.includes("file"))
-        {
-          origin = "http://127.0.0.1:4200"
+  //MIDI INPUT RUNTIME
+  const devicesInput = document.createElement("select");
+  devicesInput.onchange = ()=> {
+    const index = parseInt(devicesInput.selectedIndex);
+    midi.setInDevice(index, false);
+    //pull MIDI Control data from midi
+    midi.onControl((val, channel, type, controller)=>{
+      //if midi channel isn't currently added add it to ccVals and midi learn is active
+      if(ccVals.includes(channel)==false && document.getElementById("midi-learn-button").innerHTML == "Stop Midi Learn") {
+        ccVals.push(channel);
+      }
+      
+      //if incoming data from midi CC is from a channel we want add to learner
+      if(ccVals.includes(channel)) {
+        //add midi to val at index of channel
+        input[channel] = val;
+        //clear midi monitor on value change
+        let midiRead = "";
+        //for each input read value and add to string midiRead with formatting
+        for(let i = 0; i < Object.keys(input).length; i ++){
+          midiRead += "CC" + Object.keys(input)[i] + ": " + Object.values(input)[i] + "<br>";
         }
-        sampler.mapped = ["pan_0", "pan_1", "pan_2"];
-        sampler.loadSample(origin + "/sounds/909b.wav", 0);
-        sampler.loadSample(origin + "/sounds/909closed.wav", 1);
-        sampler.loadSample(origin + "/sounds/909.wav", 2);
-        let drumSeq = [
-           {pitch:0, start:0},
-           {pitch:0, start:18},
-           {pitch:0, start:42},
-           {pitch:0, start:54},
-           {pitch:2, start:24},
-           {pitch:2, start:72},
-        ];
-        for(let i = 0; i < 32; i++) {
-          drumSeq.push({pitch:1, start:i*6});
+        //update Midi monitor with string midiRead
+        document.getElementById("midi-label").innerHTML = midiRead;
+        //only add values to learner when regression is configured
+        if(document.getElementById("outputsSelect").style.display == "none"){
+          learner.newExample(Object.values(input), y);
         }
-        learner.addRegression(instruments.getNumMappedOutputs(), false, 10);
-        learner.onOutput = (data)=> {
-          instruments.updateMappedOutputs(data);
-        };
-        instruments.setLoop(192)
-        instruments.setTempo(86)
-        sampler.setSequence(drumSeq);
-      });
+      }
+    });
+    //PASS THROUGH MIDI NOTE TO OUTPUT
+    //pull MIDI Note On data from MIDI
+    midi.onNoteOn((NoteNumber, Velocity, channel)=>{
+      //Send Note To Output
+      midi.output.playNote(NoteNumber, selectedChannel, {rawVelocity: Velocity});
+    });
+    //pull MIDI Note Off data from MIDI
+    midi.onNoteOff((NoteNumber, Velocity, channel)=>{
+      //Send Note To Output
+      midi.output.stopNote(NoteNumber, selectedChannel, {rawVelocity: Velocity});
+    });
+  }
+  
+  //MIDI INPUT SETUP
+  function refreshInputDevices () {
+    //on first click show selector
+    if(document.getElementById("midi-input-container").children.length == 1){
+      document.getElementById("midi-input-container").appendChild(devicesInput);
     }
+    
+    //change button text on following presses
+    const elem = document.getElementById("refreshDevice-input-button");
+    if (elem.innerHTML == "Get Midi Devices") {
+      elem.innerHTML = "Refresh Midi Devices";
+    };
+    
+    //remove options from MIDI input devices
+    let i, L = devicesInput.options.length - 1;
+    for(i = L; i >= 0; i--) {
+      devicesInput.remove(i);
+    }
+    
+    //add options to MIDI input devices
+    const devices = midi.inDevices()
+    devices.forEach((d, i)=> {
+      const option = document.createElement("option");
+      option.value = i;
+      option.text = d;
+      devicesInput.appendChild(option);
+    });
+    
+    //Show Midi Learn Button
+    document.getElementById("midi-learn-button").style.display = "block";
+    //Show Clear Midi Learn Button
+    document.getElementById("midi-clearLearn-button").style.display = "block";
+    //Show Midi monitor
+    document.getElementById("midi-label").style.display = "block";
+  }
+  
+  //MIDI OUTPUT SETUP
+  const devicesOutput = document.createElement("select");
+  devicesOutput.onchange = ()=> {
+    const index = parseInt(devicesOutput.selectedIndex);
+    midi.setOutDevice(index, false);
+  }
+
+  const chans = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
+  let selectedChannel = 1;
+  const chanInput = document.createElement("select");
+
+  chanInput.onchange = ()=> {
+    const index = parseInt(chanInput.selectedIndex);
+    midioutchannel = v.index;
+  }
+
+  chans.forEach((d, i)=> {
+    const option = document.createElement("option");
+    option.value = i;
+    option.text = d;
+    chanInput.appendChild(option);
+  });
+
+  function refreshOutputDevices () {
+    //on first click show selector
+    if(document.getElementById("midi-output-container").children.length == 1){
+      document.getElementById("midi-output-container").appendChild(devicesOutput);
+      document.getElementById("midi-output-container").appendChild(chanInput);
+    }
+    //change button text on following presses
+    const elem = document.getElementById("refreshDevice-output-button");
+    if (elem.innerHTML == "Get Midi Devices") {
+      elem.innerHTML = "Refresh Midi Devices";
+    };
+    //remove options for MIDI output devices
+    let i, L = devicesOutput.options.length - 1;
+    for(i = L; i >= 0; i--) {
+      devicesOutput.remove(i);
+    }
+    //add options for MIDI output devices
+    const devices = midi.outDevices()
+    devices.forEach((d, i)=> {
+      const option = document.createElement("option");
+      option.value = i;
+      option.text = d;
+      devicesOutput.appendChild(option);
+    });
+  }
+  
+  //Change innerHTML of midi learn button used for checking state instead of global variable
+  function midiLearn () {
+    const elem = document.getElementById("midi-learn-button");
+    if (elem.innerHTML == "Start Midi Learn") {
+      elem.innerHTML = "Stop Midi Learn";
+    } else {
+      elem.innerHTML = "Start Midi Learn"
+    };
+  }
+  
+  //Clear array used for MIDI CC values
+  function midiClearLearn () {
+    ccVals.length = 0;
+  }
+  
 </script>
 </body>
 </html>

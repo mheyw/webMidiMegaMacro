@@ -1,0 +1,30 @@
+body {
+  font-family: sans-serif;
+}
+
+.midiIn {
+  padding: 5px;
+}
+
+#midi-label {
+  display: none;
+}
+
+#midi-input-container {
+  margin-top: 5px;
+  margin-bottom: 10px;
+}
+
+#midi-output-container {
+  margin-top: 5px;
+  margin-bottom: 10px;
+}
+
+.midiOut {
+  padding: 5px;
+}
+
+button {
+  width: 150px;
+  margin: 10px 10px
+}
